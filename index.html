@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>THINK BIG — SHOP SMALL · E-book</title>
+<style>
+  :root { --bg:#1c1c1e; --panel:#2a2a2d; --fg:#f2f2f2; --muted:#9a9a9f; --accent:#f5c842; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); font-family:-apple-system,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",Roboto,sans-serif; overflow:hidden; }
+  #app { display:flex; flex-direction:column; height:100%; }
+
+  header { display:flex; align-items:center; gap:14px; padding:8px 14px; background:var(--panel); border-bottom:1px solid #000; flex:0 0 auto; }
+  header .title { font-weight:700; letter-spacing:.04em; font-size:14px; white-space:nowrap; }
+  header .title small { color:var(--muted); font-weight:400; margin-left:8px; }
+  .spacer { flex:1; }
+  button { background:#3a3a3e; color:var(--fg); border:0; border-radius:6px; padding:6px 10px; font-size:13px; cursor:pointer; }
+  button:hover { background:#4a4a4f; }
+  button.on { background:var(--accent); color:#111; }
+  .pg { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--muted); }
+  .pg input { width:56px; background:#111; color:var(--fg); border:1px solid #444; border-radius:6px; padding:5px 6px; font-size:13px; text-align:center; }
+
+  main { flex:1 1 auto; display:flex; min-height:0; }
+  #toc { width:260px; flex:0 0 auto; background:var(--panel); border-right:1px solid #000; overflow-y:auto; display:none; }
+  #toc.open { display:block; }
+  #toc h3 { margin:0; padding:12px 14px 6px; font-size:12px; color:var(--muted); letter-spacing:.08em; }
+  #toc a { display:flex; justify-content:space-between; gap:8px; padding:7px 14px; color:var(--fg); text-decoration:none; font-size:13px; border-bottom:1px solid #222; }
+  #toc a:hover, #toc a.cur { background:#3a3a3e; }
+  #toc a .loc { color:var(--muted); font-size:11px; display:block; }
+  #toc a .num { color:var(--muted); font-variant-numeric:tabular-nums; }
+  #toc a.sec { font-weight:700; background:#232326; }
+
+  #stage { flex:1 1 auto; position:relative; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#111; }
+  #stage.zoom { overflow:auto; align-items:flex-start; justify-content:flex-start; cursor:grab; }
+  #stage.zoom.drag { cursor:grabbing; }
+  #spread { max-width:100%; max-height:100%; object-fit:contain; box-shadow:0 10px 40px rgba(0,0,0,.6); user-select:none; -webkit-user-drag:none; cursor:zoom-in; }
+  #stage.zoom #spread { max-width:none; max-height:none; width:1600px; cursor:default; }
+  .nav { position:absolute; top:0; bottom:0; width:12%; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity .2s; cursor:pointer; font-size:40px; color:#fff; text-shadow:0 0 8px #000; }
+  .nav:hover { opacity:.9; }
+  #prev { left:0; } #next { right:0; }
+  #stage.zoom .nav { display:none; }
+
+  footer { flex:0 0 auto; background:var(--panel); border-top:1px solid #000; overflow-x:auto; overflow-y:hidden; white-space:nowrap; padding:6px 8px; display:none; }
+  footer.open { display:block; }
+  footer img { height:64px; margin-right:6px; border:2px solid transparent; border-radius:3px; cursor:pointer; vertical-align:middle; opacity:.75; }
+  footer img:hover { opacity:1; }
+  footer img.cur { border-color:var(--accent); opacity:1; }
+  #hint { position:absolute; bottom:10px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.6); color:#ddd; font-size:12px; padding:4px 10px; border-radius:20px; pointer-events:none; opacity:0; transition:opacity .3s; }
+  #stage:hover #hint { opacity:1; }
+  @media (max-width:700px){ header .title small{display:none;} #toc{position:absolute;z-index:5;height:100%;} }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button id="tocBtn" title="목차 (T)">☰ 목차</button>
+    <div class="title">THINK BIG — SHOP SMALL <small>Unique Stores and Contemporary Retail Design · gestalten</small></div>
+    <div class="spacer"></div>
+    <div class="pg">
+      <button id="first" title="처음 (Home)">⇤</button>
+      <button id="prevBtn" title="이전 (←)">‹</button>
+      <span>p.</span><input id="pageInput" type="text" inputmode="numeric">
+      <span id="pageLabel"></span>
+      <button id="nextBtn" title="다음 (→)">›</button>
+      <button id="last" title="끝 (End)">⇥</button>
+    </div>
+    <button id="zoomBtn" title="확대 (Z)">🔍 확대</button>
+    <button id="thumbBtn" title="썸네일 (S)">▦ 썸네일</button>
+    <button id="fsBtn" title="전체화면 (F)">⛶</button>
+  </header>
+  <main>
+    <nav id="toc"><h3>CONTENTS</h3></nav>
+    <div id="stage">
+      <img id="spread" alt="">
+      <div id="prev" class="nav">‹</div>
+      <div id="next" class="nav">›</div>
+      <div id="hint">← → 페이지 이동 · 클릭 확대 · T 목차 · F 전체화면</div>
+    </div>
+  </main>
+  <footer id="thumbs"></footer>
+</div>
+<script>
+const TOTAL = 129;
+// 목차: [제목, 위치, 책 페이지]  (sec: 섹션 에세이)
+const TOC = [
+ ["New Shores and Opportunities Beckon","",4,"sec"],
+ ["ATELIER SUKHA","Amsterdam, Netherlands",10],
+ ["FACON","Buenos Aires, Argentina",16],
+ ["SADDLER & CO","Dubbo, Australia",20],
+ ["STUDIO AUGUSTINE","Marrakech, Morocco",24],
+ ["BIG NIGHT","New York, USA",28],
+ ["KAKIMORI","Tokyo, Japan",34],
+ ["Favorite Color: Local Color","",36,"sec"],
+ ["MERCHANT","Los Angeles, USA",42],
+ ["HENNE","Melbourne, Australia",48],
+ ["FRAMA STUDIO STORE","Copenhagen, Denmark",54],
+ ["TAKIZME","Tokyo, Japan",60],
+ ["HIGASHIYA GINZA","Tokyo, Japan",64],
+ ["CHENJINGKAIOFFICE","Taipei, Taiwan",68],
+ ["Customers Forming Communities","",70,"sec"],
+ ["THE MAKER STORE","Amsterdam, Netherlands",76],
+ ["OLD SOULS","Cold Spring, New York, USA",78],
+ ["BOTÁNICA FLORERÍA","San Pedro Garza García, Mexico",82],
+ ["WILD SOULS","Athens, Greece",86],
+ ["GAVELLO NEL BLUE","Mykonos, Greece",92],
+ ["BALA","New York, USA",100],
+ ["SPAZIO PERMANO","Milan, Italy",104],
+ ["BANEMA STUDIO","Lisbon, Portugal",108],
+ ["AVENUE & SON","Shanghai, China",112],
+ ["MASA","Bogotá, Colombia",116],
+ ["TAP","Ho Chi Minh City, Vietnam",120],
+ ["Welcome to the Specialists","",122,"sec"],
+ ["MARIN MONTAGUT","Paris, France",128],
+ ["À LA MÈRE DE FAMILLE","Paris, France",134],
+ ["ASTIER DE VILLATTE","Paris, France",138],
+ ["DEYROLLE","Paris, France",144],
+ ["DOLCE & GABBANA","Rome, Italy",150],
+ ["OFFICINE UNIVERSELLE BULY","Paris, France",156],
+ ["OFFICINE UNIVERSELLE BULY","Tokyo, Japan",162],
+ ["VOLGARE","Milan, Italy",168],
+ ["SABAH HOUSE NEW YORK","New York, USA",172],
+ ["ALICE THROUGH THE LOOKING GLASS","London, U.K.",176],
+ ["MINTCHI","São Paulo, Brazil",178],
+ ["COALBROOK","London, U.K.",182],
+ ["KORA BAKERY","Athens, Greece",188],
+ ["THIRD MAN RECORDS","London, U.K.",192],
+ ["SUPERETTE ANNEX","Toronto, Canada",198],
+ ["SIP 'N' SMOKE","Toronto, Canada",202],
+ ["Firing on all Channels, Real and Digital","",206,"sec"],
+ ["IMAGES D'ORIENT","Beirut, Lebanon",210],
+ ["O'FLOWER","Hwaseong, South Korea",214],
+ ["ALTELIER","Granada, Spain",222],
+ ["LUPH","Hué, Vietnam",228],
+ ["AXEL ARIGATO","Copenhagen, Denmark",234],
+ ["SORGENFRI","Oslo, Norway",240],
+ ["DOVER STREET MARKET LOS ANGELES","Los Angeles, USA",246],
+ ["Index","",252,"sec"],
+ ["Imprint","",256,"sec"],
+];
+const pad = n => String(n).padStart(3,'0');
+const spreadOfPage = p => Math.min(TOTAL, Math.max(1, Math.floor((p+2)/2)));
+const pagesOfSpread = n => n===1 ? "표지 · 속표지" : `${2*n-2}–${2*n-1}`;
+
+let cur = 1;
+const $ = id => document.getElementById(id);
+const img=$('spread'), stage=$('stage');
+
+function show(n, push=true){
+  cur = Math.min(TOTAL, Math.max(1, n));
+  img.src = `pages/${pad(cur)}.jpg`;
+  img.alt = `spread ${cur}`;
+  $('pageInput').value = cur===1 ? '' : 2*cur-2;
+  $('pageLabel').textContent = `(${pagesOfSpread(cur)}) · ${cur}/${TOTAL}`;
+  stage.classList.remove('zoom');
+  $('zoomBtn').classList.remove('on');
+  document.querySelectorAll('#thumbs img').forEach(t=>t.classList.toggle('cur', +t.dataset.n===cur));
+  const t=document.querySelector(`#thumbs img[data-n="${cur}"]`); if(t && $('thumbs').classList.contains('open')) t.scrollIntoView({inline:'center',block:'nearest'});
+  document.querySelectorAll('#toc a').forEach(a=>a.classList.remove('cur'));
+  let best=null; TOC.forEach((e,i)=>{ if(spreadOfPage(e[2])<=cur) best=i; });
+  if(best!==null){ const a=document.querySelectorAll('#toc a')[best]; a.classList.add('cur'); }
+  if(push) location.hash = '#'+cur;
+  // preload neighbours
+  [cur+1,cur-1,cur+2].forEach(k=>{ if(k>=1&&k<=TOTAL){ const i=new Image(); i.src=`pages/${pad(k)}.jpg`; }});
+  try{ localStorage.setItem('tbss_page', cur); }catch(e){}
+}
+
+// TOC
+const toc=$('toc');
+TOC.forEach((e,i)=>{
+  const a=document.createElement('a'); a.href='#'; if(e[3]==='sec') a.className='sec';
+  a.innerHTML = `<span>${e[0]}${e[1]?`<span class="loc">${e[1]}</span>`:''}</span><span class="num">${e[2]}</span>`;
+  a.onclick = ev=>{ ev.preventDefault(); show(spreadOfPage(e[2])); if(innerWidth<700) toc.classList.remove('open'); };
+  toc.appendChild(a);
+});
+// thumbs
+const th=$('thumbs');
+for(let n=1;n<=TOTAL;n++){ const t=document.createElement('img'); t.loading='lazy'; t.src=`thumbs/${pad(n)}.jpg`; t.dataset.n=n; t.title=`p.${pagesOfSpread(n)}`; t.onclick=()=>show(n); th.appendChild(t); }
+
+// controls
+$('prevBtn').onclick=$('prev').onclick=()=>show(cur-1);
+$('nextBtn').onclick=$('next').onclick=()=>show(cur+1);
+$('first').onclick=()=>show(1); $('last').onclick=()=>show(TOTAL);
+$('tocBtn').onclick=()=>{ toc.classList.toggle('open'); $('tocBtn').classList.toggle('on'); };
+$('thumbBtn').onclick=()=>{ th.classList.toggle('open'); $('thumbBtn').classList.toggle('on'); show(cur,false); };
+function toggleZoom(ev){
+  const on = stage.classList.toggle('zoom'); $('zoomBtn').classList.toggle('on', on);
+  if(on && ev && ev.clientX!==undefined){
+    const r=img.getBoundingClientRect ? null : null;
+    requestAnimationFrame(()=>{ stage.scrollLeft = (ev.offsetX/ (ev.target.clientWidth||1))*1600 - stage.clientWidth/2; stage.scrollTop = (ev.offsetY/(ev.target.clientHeight||1))*img.clientHeight - stage.clientHeight/2; });
+  }
+}
+$('zoomBtn').onclick=()=>toggleZoom();
+img.onclick=ev=>{ if(!stage.classList.contains('zoom')) toggleZoom(ev); };
+img.ondblclick=()=>{ if(stage.classList.contains('zoom')) toggleZoom(); };
+// drag to pan when zoomed
+let drag=null;
+stage.onmousedown=e=>{ if(!stage.classList.contains('zoom')) return; drag={x:e.clientX,y:e.clientY,sl:stage.scrollLeft,st:stage.scrollTop}; stage.classList.add('drag'); e.preventDefault(); };
+window.onmousemove=e=>{ if(!drag) return; stage.scrollLeft=drag.sl-(e.clientX-drag.x); stage.scrollTop=drag.st-(e.clientY-drag.y); };
+window.onmouseup=()=>{ drag=null; stage.classList.remove('drag'); };
+$('fsBtn').onclick=()=>{ document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); };
+$('pageInput').onchange=e=>{ const p=parseInt(e.target.value,10); if(!isNaN(p)) show(spreadOfPage(p)); };
+$('pageInput').onkeydown=e=>{ e.stopPropagation(); if(e.key==='Enter') e.target.blur(); };
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT') return;
+  if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){ show(cur+1); e.preventDefault(); }
+  else if(e.key==='ArrowLeft'||e.key==='PageUp'){ show(cur-1); e.preventDefault(); }
+  else if(e.key==='Home') show(1); else if(e.key==='End') show(TOTAL);
+  else if(e.key.toLowerCase()==='t') $('tocBtn').click();
+  else if(e.key.toLowerCase()==='s') $('thumbBtn').click();
+  else if(e.key.toLowerCase()==='z') toggleZoom();
+  else if(e.key.toLowerCase()==='f') $('fsBtn').click();
+  else if(e.key==='Escape' && stage.classList.contains('zoom')) toggleZoom();
+});
+// touch swipe
+let tx=null; stage.addEventListener('touchstart',e=>{ tx=e.touches[0].clientX; },{passive:true});
+stage.addEventListener('touchend',e=>{ if(tx===null||stage.classList.contains('zoom')) return; const dx=e.changedTouches[0].clientX-tx; if(Math.abs(dx)>50) show(dx<0?cur+1:cur-1); tx=null; });
+window.addEventListener('hashchange',()=>{ const n=parseInt(location.hash.slice(1),10); if(n && n!==cur) show(n,false); });
+
+let start = parseInt(location.hash.slice(1),10);
+if(!start){ try{ start=parseInt(localStorage.getItem('tbss_page'),10); }catch(e){} }
+show(start||1);
+</script>
+</body>
+</html>
